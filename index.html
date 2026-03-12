@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Crew Injuries">
+<meta name="theme-color" content="#0a0e1a">
+<title>Crew Injury Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: #0a0e1a; font-family: 'DM Sans', system-ui, sans-serif; color: #f1f5f9; -webkit-tap-highlight-color: transparent; }
+  input, select, textarea, button { font-family: 'DM Sans', system-ui, sans-serif; }
+  select { -webkit-appearance: none; appearance: none; }
+  ::-webkit-scrollbar { display: none; }
+
+/* ── Layout shells ── */
+#lock-screen, #app { position: fixed; inset: 0; overflow-y: auto; }
+#lock-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 24px; }
+#app { display: none; }
+
+/* ── Lock screen ── */
+.lock-logo { width: 64px; height: 64px; background: #fbbf24; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 28px; margin-bottom: 24px; box-shadow: 0 0 40px #fbbf2433; }
+.lock-title { font-size: 22px; font-weight: 700; color: #f1f5f9; margin-bottom: 6px; }
+.lock-sub { font-size: 14px; color: #475569; margin-bottom: 32px; font-family: ‘DM Mono’, monospace; letter-spacing: 1px; }
+.lock-input { width: 100%; max-width: 320px; background: #131929; border: 1px solid #334155; border-radius: 14px; padding: 14px 18px; color: #f1f5f9; font-size: 16px; outline: none; margin-bottom: 12px; text-align: center; letter-spacing: 2px; transition: border-color 0.2s; }
+.lock-input:focus { border-color: #fbbf24; }
+.lock-input.error { border-color: #ef4444; animation: shake 0.3s; }
+.lock-btn { width: 100%; max-width: 320px; background: #fbbf24; color: #0a0e1a; border: none; border-radius: 14px; padding: 14px; font-size: 16px; font-weight: 700; cursor: pointer; transition: opacity 0.2s; }
+.lock-btn:active { opacity: 0.85; }
+.lock-error { font-size: 13px; color: #ef4444; margin-top: 8px; height: 18px; }
+@keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-8px)} 75%{transform:translateX(8px)} }
+
+/* ── App screens ── */
+.screen { display: none; min-height: 100vh; max-width: 480px; margin: 0 auto; }
+.screen.active { display: block; }
+
+/* ── Sticky header ── */
+.header { position: sticky; top: 0; z-index: 50; background: #0f172a; border-bottom: 1px solid #1e293b; padding: 16px 20px; }
+.header-row { display: flex; align-items: center; gap: 10px; }
+
+/* ── Buttons ── */
+.btn { border: none; border-radius: 10px; cursor: pointer; font-family: ‘DM Sans’, sans-serif; font-weight: 600; transition: opacity 0.15s, background 0.15s; }
+.btn:active { opacity: 0.8; }
+.btn-primary { background: #fbbf24; color: #0a0e1a; padding: 9px 18px; font-size: 14px; font-weight: 700; }
+.btn-ghost { background: #1e293b; color: #94a3b8; padding: 7px 14px; font-size: 13px; border: 1px solid #334155; }
+.btn-danger { background: transparent; color: #ef4444; width: 100%; padding: 13px; font-size: 14px; border: 1px solid #ef444433; border-radius: 12px; }
+.btn-save { background: #fbbf24; color: #0a0e1a; width: 100%; padding: 16px; font-size: 16px; font-weight: 700; border-radius: 12px; }
+.btn-save:disabled { background: #1e293b; color: #475569; cursor: default; }
+
+/* ── Stat pills ── */
+.pills { display: flex; gap: 8px; padding: 14px 16px; overflow-x: auto; }
+.pill { flex-shrink: 0; border-radius: 20px; padding: 6px 12px; cursor: pointer; display: flex; align-items: center; gap: 6px; border: 1px solid; transition: all 0.15s; }
+.pill:active { opacity: 0.8; }
+
+/* ── Injury cards ── */
+.card { background: #131929; border: 1px solid #1e293b; border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; cursor: pointer; transition: border-color 0.15s; }
+.card:active { border-color: #334155; }
+.card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+.card-name { font-weight: 700; font-size: 16px; color: #f1f5f9; }
+.badge { border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 600; white-space: nowrap; margin-left: 8px; border: 1px solid; }
+.card-sub { font-size: 13px; color: #94a3b8; margin-bottom: 4px; }
+.card-sub strong { color: #cbd5e1; font-weight: 500; }
+.card-foot { display: flex; justify-content: space-between; align-items: center; }
+.mono { font-family: ‘DM Mono’, monospace; font-size: 11px; color: #475569; }
+
+/* ── Empty state ── */
+.empty { text-align: center; padding: 60px 0; color: #475569; }
+.empty-icon { font-size: 36px; margin-bottom: 12px; }
+.empty-title { font-size: 15px; font-weight: 500; }
+.empty-sub { font-size: 13px; margin-top: 4px; }
+
+/* ── Search ── */
+.search-wrap { padding: 0 16px 12px; }
+.search-input { width: 100%; background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 10px 14px; color: #f1f5f9; font-size: 14px; outline: none; }
+.search-input::placeholder { color: #475569; }
+
+/* ── Form ── */
+.form-body { padding: 20px 16px 80px; }
+.field { margin-bottom: 18px; }
+.label { font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 8px; }
+.input { width: 100%; background: #131929; border: 1px solid #334155; border-radius: 10px; padding: 12px 14px; color: #f1f5f9; font-size: 15px; outline: none; transition: border-color 0.2s; }
+.input:focus { border-color: #fbbf2466; }
+.input::placeholder { color: #475569; }
+textarea.input { resize: none; }
+.date-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+input[type=“date”]::-webkit-calendar-picker-indicator { filter: invert(0.5); }
+
+/* ── Tag grid (body areas) ── */
+.tag-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.tag { border-radius: 20px; padding: 6px 12px; font-size: 13px; cursor: pointer; border: 1px solid; transition: all 0.15s; }
+.tag:active { opacity: 0.8; }
+.tag.off { background: #1e293b; color: #94a3b8; border-color: #334155; }
+.tag.on  { background: #fbbf24; color: #0a0e1a; border-color: #fbbf24; font-weight: 600; }
+
+/* ── Status buttons ── */
+.status-list { display: flex; flex-direction: column; gap: 8px; }
+.status-btn { border-radius: 10px; padding: 10px 16px; font-size: 14px; cursor: pointer; border: 1px solid; text-align: left; display: flex; align-items: center; gap: 10px; transition: all 0.15s; }
+.status-btn:active { opacity: 0.8; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* ── Detail ── */
+.detail-body { padding: 20px 16px 80px; }
+.info-card { background: #131929; border: 1px solid #1e293b; border-radius: 16px; padding: 16px 18px; margin-bottom: 14px; }
+.info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #1e293b; }
+.info-row:last-child { border-bottom: none; }
+.info-label { font-size: 13px; color: #64748b; }
+.info-val { font-size: 13px; color: #f1f5f9; font-weight: 500; text-align: right; max-width: 55%; }
+.notes-section { padding-top: 10px; }
+.notes-label { font-size: 12px; color: #64748b; margin-bottom: 4px; }
+.notes-text { font-size: 13px; color: #cbd5e1; line-height: 1.6; }
+
+/* ── Timeline ── */
+.timeline-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.timeline-title { font-size: 14px; font-weight: 600; }
+.timeline-entry { display: flex; gap: 12px; padding-bottom: 14px; }
+.tl-left { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
+.tl-dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 3px; flex-shrink: 0; }
+.tl-line { width: 1px; flex: 1; background: #1e293b; margin-top: 4px; }
+.tl-right { flex: 1; padding-bottom: 4px; }
+.tl-date { font-family: ‘DM Mono’, monospace; font-size: 11px; color: #475569; margin-bottom: 3px; }
+.tl-note { font-size: 13px; color: #cbd5e1; line-height: 1.5; }
+
+/* ── Note input ── */
+.note-input-wrap { margin-bottom: 14px; }
+.note-textarea { width: 100%; background: #0a0e1a; border: 1px solid #334155; border-radius: 10px; padding: 10px 12px; color: #f1f5f9; font-size: 13px; font-family: ‘DM Sans’, sans-serif; resize: none; outline: none; margin-bottom: 8px; }
+.btn-note-save { background: #fbbf24; color: #0a0e1a; border: none; border-radius: 8px; padding: 8px 16px; font-weight: 700; font-size: 13px; cursor: pointer; }
+
+/* ── Confirm delete ── */
+.confirm-wrap { background: #1e293b; border-radius: 12px; padding: 16px; border: 1px solid #ef444433; }
+.confirm-msg { font-size: 14px; color: #f1f5f9; margin-bottom: 12px; text-align: center; }
+.confirm-row { display: flex; gap: 8px; }
+.btn-cancel-del { flex: 1; background: #334155; border: none; border-radius: 8px; padding: 10px; color: #f1f5f9; font-size: 14px; cursor: pointer; }
+.btn-confirm-del { flex: 1; background: #ef4444; border: none; border-radius: 8px; padding: 10px; color: #fff; font-size: 14px; font-weight: 700; cursor: pointer; }
+</style>
+
+</head>
+<body>
+
+<!-- ═══ APP ════════════════════════════════════════════════════ -->
+
+<div id="app" style="display:block">
+
+  <!-- ── DASHBOARD ── -->
+
+  <div id="screen-dashboard" class="screen active">
+    <div class="header">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;">
+        <div style="width:7px;height:7px;border-radius:50%;background:#fbbf24;"></div>
+        <span style="font-family:'DM Mono',monospace;font-size:11px;color:#64748b;letter-spacing:2px;text-transform:uppercase;">Columbus Crew</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;">
+        <h1 style="font-size:22px;font-weight:700;color:#f1f5f9;">Injury Tracker</h1>
+        <button class="btn btn-primary" onclick="openAdd()">+ Log</button>
+      </div>
+    </div>
+
+```
+<div class="pills" id="pills-row"></div>
+
+<div class="search-wrap">
+  <input class="search-input" id="search-input" placeholder="Search player, area, injury..." oninput="renderList()">
+</div>
+
+<div style="padding:0 16px 80px;" id="injury-list"></div>
+```
+
+  </div>
+
+  <!-- ── DETAIL ── -->
+
+  <div id="screen-detail" class="screen">
+    <div class="header">
+      <div class="header-row">
+        <button class="btn btn-ghost" onclick="showScreen('dashboard')">← Back</button>
+        <span style="font-size:13px;color:#64748b;flex:1;text-align:center;">Injury Detail</span>
+        <button class="btn btn-ghost" onclick="openEdit()">Edit</button>
+      </div>
+    </div>
+    <div class="detail-body" id="detail-body"></div>
+  </div>
+
+  <!-- ── ADD / EDIT FORM ── -->
+
+  <div id="screen-form" class="screen">
+    <div class="header" style="position:sticky;top:0;z-index:50;">
+      <div class="header-row">
+        <button class="btn btn-ghost" id="form-back-btn" onclick="formBack()">← Back</button>
+        <span style="font-size:14px;font-weight:600;flex:1;text-align:center;" id="form-title">Log Injury</span>
+        <button class="btn btn-primary" id="form-save-top" onclick="submitForm()">Save</button>
+      </div>
+    </div>
+    <div class="form-body" id="form-body"></div>
+  </div>
+
+</div>
+
+<script>
+// ─── Constants ─────────────────────────────────────────────────
+const STORAGE_KEY = "crew_injuries_v1";
+
+const ROSTER = [
+  "Akhundzade, Nariman","Arfsten, Max","Gazdag, Dániel","Gomes, André",
+  "Moreira, Steven","Rossi, Diego","Abou Ali, Wessam","Zawadzki, Sean",
+  "Farsi, Mahle","Habroune, Taha","Elliot, Quinton","Presthus, Owen",
+  "Adams, Chase","Pruter, Luke","Zengue, Zach","Other / Unlisted"
+];
+
+const BODY_AREAS = [
+  "Head / Concussion","Neck / Cervical","Shoulder","Arm / Elbow",
+  "Wrist / Hand","Chest / Ribs","Back / Spine","Abdomen / Core",
+  "Hip / Groin","Hamstring","Quadriceps","Adductor","Knee",
+  "Calf / Achilles","Ankle","Foot / Toe","General / Illness","Other"
+];
+
+const STATUSES = {
+  "Active Injury":    { color:"#ef4444", bg:"#fef2f2", dot:"#ef4444" },
+  "Day-to-Day":       { color:"#f59e0b", bg:"#fffbeb", dot:"#f59e0b" },
+  "Return Protocol":  { color:"#3b82f6", bg:"#eff6ff", dot:"#3b82f6" },
+  "Cleared":          { color:"#10b981", bg:"#f0fdf4", dot:"#10b981" },
+};
+
+// ─── State ─────────────────────────────────────────────────────
+let injuries = [];
+let activeFilter = "all";
+let selectedId = null;
+let formData = null;
+let confirmingDelete = false;
+let addingNote = false;
+
+// ─── Init ──────────────────────────────────────────────────────
+function loadData() {
+  try { injuries = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch(e) { injuries = []; }
+  renderDashboard();
+}
+
+function saveData() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(injuries));
+}
+
+// ─── Helpers ───────────────────────────────────────────────────
+function today() { return new Date().toISOString().split("T")[0]; }
+
+function fmtDate(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString("en-US", { month:"short", day:"numeric", year:"numeric" });
+}
+
+function showScreen(name) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById("screen-" + name).classList.add("active");
+  document.getElementById("app").scrollTop = 0;
+}
+
+// ─── Dashboard ─────────────────────────────────────────────────
+function renderDashboard() {
+  renderPills();
+  renderList();
+}
+
+function renderPills() {
+  const counts = {
+    "Active Injury": injuries.filter(i => i.status === "Active Injury").length,
+    "Day-to-Day": injuries.filter(i => i.status === "Day-to-Day").length,
+    "Return Protocol": injuries.filter(i => i.status === "Return Protocol").length,
+    "Cleared": injuries.filter(i => i.status === "Cleared").length,
+  };
+  const labels = { "Active Injury":"Active","Day-to-Day":"Day-to-Day","Return Protocol":"Protocol","Cleared":"Cleared" };
+  const row = document.getElementById("pills-row");
+  row.innerHTML = Object.entries(STATUSES).map(([k,v]) => {
+    const active = activeFilter === k;
+    return `<button class="pill" onclick="toggleFilter('${k}')"
+      style="background:${active ? v.dot : '#1e293b'};border-color:${active ? v.dot : '#334155'}">
+      <span style="font-size:15px;font-weight:700;color:${active ? '#fff' : v.dot}">${counts[k]}</span>
+      <span style="font-size:12px;color:${active ? 'rgba(255,255,255,0.85)' : '#94a3b8'}">${labels[k]}</span>
+    </button>`;
+  }).join("");
+}
+
+function toggleFilter(k) {
+  activeFilter = activeFilter === k ? "all" : k;
+  renderDashboard();
+}
+
+function renderList() {
+  const search = (document.getElementById("search-input")?.value || "").toLowerCase();
+  const filtered = injuries.filter(i => {
+    const mf = activeFilter === "all" || i.status === activeFilter;
+    const ms = !search || i.player.toLowerCase().includes(search) || (i.bodyArea||"").toLowerCase().includes(search) || (i.injuryType||"").toLowerCase().includes(search);
+    return mf && ms;
+  }).sort((a,b) => b.id - a.id);
+
+  const list = document.getElementById("injury-list");
+  if (filtered.length === 0) {
+    list.innerHTML = `<div class="empty">
+      <div class="empty-icon">🏥</div>
+      <div class="empty-title">${injuries.length === 0 ? "No injuries logged" : "No results"}</div>
+      <div class="empty-sub">${injuries.length === 0 ? "Tap + Log to add the first entry" : "Try a different search or filter"}</div>
+    </div>`;
+    return;
+  }
+
+  list.innerHTML = filtered.map(inj => {
+    const cfg = STATUSES[inj.status] || STATUSES["Active Injury"];
+    return `<div class="card" onclick="openDetail(${inj.id})">
+      <div class="card-header">
+        <div class="card-name">${inj.player}</div>
+        <span class="badge" style="color:${cfg.color};background:${cfg.bg};border-color:${cfg.color}33">${inj.status}</span>
+      </div>
+      <div class="card-sub"><strong>${inj.bodyArea}</strong>${inj.injuryType ? " · " + inj.injuryType : ""}</div>
+      <div class="card-foot">
+        <span class="mono">${fmtDate(inj.dateReported)}</span>
+        ${inj.estimatedReturn ? `<span class="mono">ETR: <span style="color:#94a3b8">${fmtDate(inj.estimatedReturn)}</span></span>` : ""}
+      </div>
+    </div>`;
+  }).join("");
+}
+
+// ─── Detail ────────────────────────────────────────────────────
+function openDetail(id) {
+  selectedId = id;
+  confirmingDelete = false;
+  addingNote = false;
+  renderDetail();
+  showScreen("detail");
+}
+
+function renderDetail() {
+  const inj = injuries.find(i => i.id === selectedId);
+  if (!inj) return;
+  const cfg = STATUSES[inj.status] || STATUSES["Active Injury"];
+  const rows = [
+    ["Body Area", inj.bodyArea],
+    ["Injury Type", inj.injuryType || "—"],
+    ["Mechanism", inj.mechanism || "—"],
+    ["Date Reported", fmtDate(inj.dateReported)],
+    ["Est. Return", inj.estimatedReturn ? fmtDate(inj.estimatedReturn) : "TBD"],
+  ];
+
+  const history = [...(inj.history || [])].reverse();
+
+  document.getElementById("detail-body").innerHTML = `
+    <div class="info-card">
+      <div style="font-size:22px;font-weight:700;margin-bottom:8px;">${inj.player}</div>
+      <span class="badge" style="color:${cfg.color};background:${cfg.bg};border-color:${cfg.color}44;padding:5px 14px;font-size:12px;">${inj.status}</span>
+    </div>
+
+    <div class="info-card">
+      ${rows.map(([l,v]) => `<div class="info-row"><span class="info-label">${l}</span><span class="info-val">${v}</span></div>`).join("")}
+      ${inj.notes ? `<div class="notes-section"><div class="notes-label">Notes</div><div class="notes-text">${inj.notes}</div></div>` : ""}
+    </div>
+
+    <div class="info-card">
+      <div class="timeline-header">
+        <span class="timeline-title">Timeline</span>
+        <button class="btn btn-ghost" style="font-size:12px;" onclick="toggleNote()">${addingNote ? "Cancel" : "+ Note"}</button>
+      </div>
+      ${addingNote ? `<div class="note-input-wrap">
+        <textarea class="note-textarea" id="note-text" rows="3" placeholder="Add a progress note..."></textarea>
+
+```
+    <button class="btn-note-save" onclick="saveNote()">Save Note</button>
+  </div>` : ""}
+  <div>
+    ${history.map((h, idx) => {
+      const hcfg = STATUSES[h.status] || STATUSES["Active Injury"];
+      return `<div class="timeline-entry">
+        <div class="tl-left">
+          <div class="tl-dot" style="background:${hcfg.dot}"></div>
+          ${idx < history.length - 1 ? '<div class="tl-line"></div>' : ""}
+        </div>
+        <div class="tl-right">
+          <div class="tl-date">${fmtDate(h.date)}</div>
+          <div class="tl-note">${h.note}</div>
+        </div>
+      </div>`;
+    }).join("")}
+  </div>
+</div>
+
+${confirmingDelete ? `
+<div class="confirm-wrap">
+  <div class="confirm-msg">Delete this injury record?</div>
+  <div class="confirm-row">
+    <button class="btn-cancel-del" onclick="cancelDelete()">Cancel</button>
+    <button class="btn-confirm-del" onclick="deleteInjury()">Delete</button>
+  </div>
+</div>` : `<button class="btn-danger" onclick="startDelete()">Delete Record</button>`}
+```
+
+`;
+}
+
+function toggleNote() {
+addingNote = !addingNote;
+renderDetail();
+if (addingNote) setTimeout(() => document.getElementById(“note-text”)?.focus(), 50);
+}
+
+function saveNote() {
+const text = document.getElementById(“note-text”)?.value?.trim();
+if (!text) return;
+injuries = injuries.map(i => {
+if (i.id !== selectedId) return i;
+return { …i, history: […(i.history || []), { date: today(), status: i.status, note: text }] };
+});
+saveData();
+addingNote = false;
+renderDetail();
+}
+
+function startDelete() { confirmingDelete = true; renderDetail(); }
+function cancelDelete() { confirmingDelete = false; renderDetail(); }
+function deleteInjury() {
+injuries = injuries.filter(i => i.id !== selectedId);
+saveData();
+selectedId = null;
+renderDashboard();
+showScreen(“dashboard”);
+}
+
+// ─── Add / Edit Form ───────────────────────────────────────────
+function openAdd() {
+formData = {
+id: Date.now(), player: “”, customPlayer: “”, bodyArea: “”,
+injuryType: “”, status: “Active Injury”, dateReported: today(),
+estimatedReturn: “”, mechanism: “”, notes: “”,
+history: [{ date: today(), status: “Active Injury”, note: “Initial report logged.” }]
+};
+document.getElementById(“form-title”).textContent = “Log Injury”;
+renderForm();
+showScreen(“form”);
+}
+
+function openEdit() {
+const inj = injuries.find(i => i.id === selectedId);
+if (!inj) return;
+formData = { …inj, customPlayer: “” };
+document.getElementById(“form-title”).textContent = “Edit Injury”;
+renderForm();
+showScreen(“form”);
+}
+
+function formBack() {
+const isEdit = injuries.some(i => i.id === formData?.id);
+showScreen(isEdit ? “detail” : “dashboard”);
+}
+
+function renderForm() {
+const f = formData;
+const isEdit = injuries.some(i => i.id === f.id);
+
+document.getElementById(“form-body”).innerHTML = `<!-- Player --> <div class="field"> <label class="label">Player *</label> <select class="input" id="f-player" onchange="onPlayerChange()"> <option value="" disabled ${!f.player ? "selected" : ""}>Select player...</option> ${ROSTER.map(p =>`<option value=”${p}” ${f.player === p ? “selected” : “”}>${p}</option>`).join("")} </select> ${f.player === "Other / Unlisted" ? `<input class=“input” style=“margin-top:8px;” id=“f-custom” placeholder=“Enter player name…” value=”${f.customPlayer||””}” oninput=“formData.customPlayer=this.value;updateSaveBtn()”>` : “”}
+</div>
+
+```
+<!-- Body Area -->
+<div class="field">
+  <label class="label">Body Area *</label>
+  <div class="tag-grid">
+    ${BODY_AREAS.map(a => `<button class="tag ${f.bodyArea===a?'on':'off'}" onclick="selectArea('${a}')">${a}</button>`).join("")}
+  </div>
+</div>
+
+<!-- Injury Type -->
+<div class="field">
+  <label class="label">Injury Type *</label>
+  <input class="input" id="f-type" placeholder="e.g. Grade 1 strain, sprain, contusion..." value="${f.injuryType||""}" oninput="formData.injuryType=this.value;updateSaveBtn()">
+</div>
+
+<!-- Status -->
+<div class="field">
+  <label class="label">Status</label>
+  <div class="status-list">
+    ${Object.entries(STATUSES).map(([s,v]) => `
+      <button class="status-btn" onclick="selectStatus('${s}')"
+        style="background:${f.status===s?v.bg:'#1e293b'};color:${f.status===s?v.color:'#94a3b8'};border-color:${f.status===s?v.color+'66':'#334155'};font-weight:${f.status===s?'600':'400'}">
+        <div class="status-dot" style="background:${v.dot}"></div>${s}
+      </button>`).join("")}
+  </div>
+</div>
+
+<!-- Dates -->
+<div class="field">
+  <div class="date-grid">
+    <div>
+      <label class="label">Date Reported</label>
+      <input class="input" type="date" id="f-date" value="${f.dateReported||""}" oninput="formData.dateReported=this.value">
+    </div>
+    <div>
+      <label class="label">Est. Return</label>
+      <input class="input" type="date" id="f-etr" value="${f.estimatedReturn||""}" oninput="formData.estimatedReturn=this.value">
+    </div>
+  </div>
+</div>
+
+<!-- Mechanism -->
+<div class="field">
+  <label class="label">Mechanism</label>
+  <input class="input" id="f-mech" placeholder="e.g. Non-contact, tackle, collision..." value="${f.mechanism||""}" oninput="formData.mechanism=this.value">
+</div>
+
+<!-- Notes -->
+<div class="field">
+  <label class="label">Notes</label>
+  <textarea class="input" id="f-notes" rows="4" placeholder="Clinical notes, imaging findings, treatment plan..." oninput="formData.notes=this.value">${f.notes||""}</textarea>
+</div>
+
+<button class="btn-save" id="form-save-bottom" onclick="submitForm()" ${isFormValid()?'':'disabled'}>
+  ${isEdit ? "Update Record" : "Log Injury"}
+</button>
+```
+
+`;
+}
+
+function onPlayerChange() {
+formData.player = document.getElementById(“f-player”).value;
+formData.customPlayer = “”;
+renderForm();
+}
+
+function selectArea(a) {
+formData.bodyArea = a;
+renderForm();
+}
+
+function selectStatus(s) {
+formData.status = s;
+renderForm();
+}
+
+function isFormValid() {
+const f = formData;
+if (!f) return false;
+const playerOk = f.player && (f.player !== “Other / Unlisted” || f.customPlayer?.trim());
+return playerOk && f.bodyArea && f.injuryType?.trim();
+}
+
+function updateSaveBtn() {
+const valid = isFormValid();
+document.getElementById(“form-save-top”).disabled = !valid;
+const bot = document.getElementById(“form-save-bottom”);
+if (bot) bot.disabled = !valid;
+}
+
+function submitForm() {
+if (!isFormValid()) return;
+const f = formData;
+const playerName = f.player === “Other / Unlisted” ? (f.customPlayer?.trim() || “Unknown”) : f.player;
+const existing = injuries.find(i => i.id === f.id);
+let entry = { …f, player: playerName };
+
+if (existing) {
+if (existing.status !== f.status) {
+entry.history = […(existing.history || []), { date: today(), status: f.status, note: `Status updated to "${f.status}".` }];
+}
+injuries = injuries.map(i => i.id === f.id ? entry : i);
+} else {
+injuries = [entry, …injuries];
+}
+
+saveData();
+renderDashboard();
+
+// Flash save button
+const btn = document.getElementById(“form-save-top”);
+if (btn) { btn.textContent = “✓ Saved”; setTimeout(() => { btn.textContent = “Save”; }, 1000); }
+
+setTimeout(() => showScreen(“dashboard”), 800);
+}
+
+document.addEventListener(“DOMContentLoaded”, loadData);
+// Prevent zoom on double-tap iOS
+document.addEventListener(“dblclick”, e => e.preventDefault(), { passive: false });
+</script>
+
+</body>
+</html>
